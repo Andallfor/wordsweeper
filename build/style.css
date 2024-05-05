@@ -24,6 +24,9 @@
   pointer-events: none;
   border: 0px;
 }
+#crossword-grid .cell.goal {
+  background-color: green;
+}
 
 #content {
   display: flex;

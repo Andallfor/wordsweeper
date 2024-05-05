@@ -36,25 +36,79 @@ class Game {
         let char = "";
         let blacklist = [];
         let cur = [];
+        this.markAsValid(p);
+        /*
         for (let i = 0; i < n; i++) {
-            let dir = this.rand(0, 1) == 0 ? { x: 0, y: 1 } : { x: 1, y: 0 };
-            let maxLenth = 0;
+            let dir: Point = Math.random() < 0.5 ? {x: 0, y: 1} : {x: 1, y: 0};
+            let w = this.getRandWord(this.size);
+
+            let lineInd = this.mag(this.mul(p, dir));
+
+            let min = Math.max(0, lineInd - w.length + 1);
+            let max = Math.min(lineInd, this.size - w.length);
+
+            let offset = this.rand(min, max);
+
+            if (dir.x != 0) this.write({x: offset, y: p.y}, w, dir);
+            else this.write({x: p.x, y: offset}, w, dir);
+            
+            return;
+        }*/
+        let out = this.wordThroughPoint(p, "", blacklist);
+        this.write(out.start, out.word, out.dir);
+    }
+    wordThroughPoint(p, char, blacklist) {
+        let dir = Math.random() < 0.5 ? { x: 0, y: 1 } : { x: 1, y: 0 };
+        // figure out how far we can go in the +/- neg directions
+        let pos = this.getExtent(p, dir, blacklist);
+        let neg = this.getExtent(p, this.mul(dir, { x: -1, y: -1 }), blacklist);
+        console.log(pos, neg);
+        let w = this.getRandWord(pos + neg + 1, pos, char);
+        let lineInd = this.mag(this.mul(p, dir));
+        let min = lineInd - neg;
+        let max = lineInd + pos - w.length;
+        console.log(min, max);
+        console.log(w);
+        let offset = this.rand(min, max);
+        if (dir.x != 0)
+            return { start: { x: offset, y: p.y }, word: w, dir: dir };
+        else
+            return { start: { x: p.x, y: offset }, word: w, dir: dir };
+    }
+    getExtent(p, dir, blacklist) {
+        let copy = { x: p.x, y: p.y };
+        let length = 0;
+        while (this.inBounds(copy)) {
+            copy = this.add(copy, dir);
+            if (this.hasNeighbor(copy, blacklist)) {
+                length--;
+                break;
+            } // gap of 1 to other words
+            length++;
+        }
+        return length;
+    }
+    hasNeighbor(p, blacklist, dirs = [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }]) {
+        for (let i = 0; i < 4; i++) {
+            let c = this.add(p, dirs[i]);
+            if (!this.inBounds(c))
+                continue;
+            if (blacklist.includes(c))
+                return true;
+        }
+        return false;
+    }
+    write(p, s, d) {
+        for (let i = 0; i < s.length; i++) {
+            this.getCell(p).value = s.charAt(i);
+            p = this.add(p, d);
         }
     }
-    possibleLength(start, dir, blacklist) {
-        let c = { x: start.x, y: start.y };
-        let d = { x: dir.x, y: dir.y };
-        let l = 1;
-        // traverse pos
-        while (this.inBounds(c)) {
-            c = this.add(c, d);
-            if (blacklist.includes(c)) {
-                // should always be a gap to any other word
-                l -= 1;
-                break;
-            }
-        }
-        return l;
+    getCell(p) {
+        return document.getElementById('cell-' + p.x + '-' + p.y);
+    }
+    markAsValid(p) {
+        this.getCell(p).classList.add('goal');
     }
     inBounds(p) {
         return p.x >= 0 && p.y >= 0 && p.x < this.size && p.y < this.size;
@@ -62,14 +116,23 @@ class Game {
     add(p1, p2) {
         return { x: p1.x + p2.x, y: p1.y + p2.y };
     }
+    sub(p1, p2) {
+        return { x: p1.x - p2.x, y: p1.y - p2.y };
+    }
+    mul(p1, p2) {
+        return { x: p1.x * p2.x, y: p1.y * p2.y };
+    }
+    mag(p1) {
+        return Math.sqrt(p1.x * p1.x + p1.y * p1.y);
+    }
     rand(min, max) {
         return Math.floor(Math.random() * (max - min) + min);
     }
-    getRandWord(maxLength, lengthAfter, char = "", iter = 10) {
+    getRandWord(maxLength, lengthAfter = 0, char = "", iter = 10) {
         let c = 0;
         while (true) {
             let n = this.rand(0, WORDS.length);
-            if (WORDS[n].length < maxLength) {
+            if (WORDS[n].length < maxLength && WORDS[n].length >= 3) {
                 if (char == "")
                     return WORDS[n];
                 else {

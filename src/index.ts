@@ -43,29 +43,86 @@ class Game {
         let char = "";
         let blacklist: Point[] = [];
         let cur: Point[] = [];
+        this.markAsValid(p);
+        /*
         for (let i = 0; i < n; i++) {
-            let dir: Point = this.rand(0, 1) == 0 ? {x: 0, y: 1} : {x: 1, y: 0};
+            let dir: Point = Math.random() < 0.5 ? {x: 0, y: 1} : {x: 1, y: 0};
+            let w = this.getRandWord(this.size);
 
-            let maxLenth = 0;
+            let lineInd = this.mag(this.mul(p, dir));
+
+            let min = Math.max(0, lineInd - w.length + 1);
+            let max = Math.min(lineInd, this.size - w.length);
+
+            let offset = this.rand(min, max);
+
+            if (dir.x != 0) this.write({x: offset, y: p.y}, w, dir);
+            else this.write({x: p.x, y: offset}, w, dir);
+            
+            return;
+        }*/
+        let out = this.wordThroughPoint(p, "", blacklist);
+        this.write(out.start, out.word, out.dir);
+    }
+
+    private wordThroughPoint(p: Point, char: string, blacklist: Point[]) : {start: Point, word: string, dir: Point} {
+        let dir: Point = Math.random() < 0.5 ? {x: 0, y: 1} : {x: 1, y: 0};
+
+        // figure out how far we can go in the +/- neg directions
+        let pos = this.getExtent(p, dir, blacklist);
+        let neg = this.getExtent(p, this.mul(dir, {x: -1, y: -1}), blacklist);
+        console.log(pos, neg);
+
+        let w = this.getRandWord(pos + neg + 1, pos, char);
+
+        let lineInd = this.mag(this.mul(p, dir));
+
+        let min = lineInd - neg;
+        let max = lineInd + pos - w.length;
+        console.log(min, max);
+        console.log(w);
+
+        let offset = this.rand(min, max);
+
+        if (dir.x != 0) return {start: {x: offset, y: p.y}, word: w, dir: dir};
+        else return {start: {x: p.x, y: offset}, word: w, dir: dir};
+    }
+
+    private getExtent(p: Point, dir: Point, blacklist: Point[]): number {
+        let copy = {x: p.x, y: p.y};
+        let length = 0;
+        while (this.inBounds(copy)) {
+            copy = this.add(copy, dir);
+            if (this.hasNeighbor(copy, blacklist)) { length--; break; } // gap of 1 to other words
+            length++;
+        }
+
+        return length;
+    }
+
+    private hasNeighbor(p: Point, blacklist: Point[], dirs: Point[] = [{x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 0}, {x: -1, y: 0}]) {
+        for (let i = 0; i < 4; i++) {
+            let c = this.add(p, dirs[i]);
+            if (!this.inBounds(c)) continue;
+            if (blacklist.includes(c)) return true;
+        }
+
+        return false;
+    }
+
+    private write(p: Point, s: string, d: Point) {
+        for (let i = 0; i < s.length; i++) {
+            (this.getCell(p) as HTMLInputElement).value = s.charAt(i);
+            p = this.add(p, d);
         }
     }
 
-    private possibleLength(start: Point, dir: Point, blacklist: Point[]): number {
-        let c = {x: start.x, y: start.y};
-        let d = {x: dir.x, y: dir.y};
-        let l = 1;
+    private getCell(p: Point): HTMLElement {
+        return document.getElementById('cell-' + p.x + '-' + p.y)!;
+    }
 
-        // traverse pos
-        while (this.inBounds(c)) {
-            c = this.add(c, d);
-            if (blacklist.includes(c)) {
-                // should always be a gap to any other word
-                l -= 1;
-                break;
-            }
-        }
-
-        return l;
+    private markAsValid(p: Point) {
+        this.getCell(p).classList.add('goal');
     }
 
     private inBounds(p: Point) {
@@ -76,15 +133,27 @@ class Game {
         return {x: p1.x + p2.x, y: p1.y + p2.y};
     }
 
+    private sub(p1: Point, p2: Point) {
+        return {x: p1.x - p2.x, y: p1.y - p2.y};
+    }
+
+    private mul(p1: Point, p2: Point) {
+        return {x: p1.x * p2.x, y: p1.y * p2.y};
+    }
+
+    private mag(p1: Point) {
+        return Math.sqrt(p1.x * p1.x + p1.y * p1.y);
+    }
+
     private rand(min: number, max: number): number {
         return Math.floor(Math.random() * (max - min) + min);
     }
 
-    private getRandWord(maxLength: number, lengthAfter: number, char: string = "", iter: number = 10): string {
+    private getRandWord(maxLength: number, lengthAfter: number = 0, char: string = "", iter: number = 10): string {
         let c = 0;
         while (true) {
             let n = this.rand(0, WORDS.length);
-            if (WORDS[n].length < maxLength) {
+            if (WORDS[n].length < maxLength && WORDS[n].length >= 3) {
                 if (char == "") return WORDS[n];
                 else {
                     let ind = WORDS[n].indexOf(char);
