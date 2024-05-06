@@ -1,4 +1,4 @@
-with open("src/google-10000-english.txt", "r") as f:
+with open("src/20k.txt", "r") as f: # shush
     t = f.read()
     t = t.replace('\n', '", "')
     t = f'["{t}"]'

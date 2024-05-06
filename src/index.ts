@@ -16,6 +16,10 @@ class Game {
     private cells: Cell[] = [];
     private walls: Point[] = [];
 
+    private timeElement: HTMLElement;
+    private lettersCount = 0;
+    private undoCount = 0;
+
     constructor(size: number) {
         this.size = size;
 
@@ -33,8 +37,10 @@ class Game {
                 let input = document.createElement('input'); input.id = `cell-${i}-${j}-input`; input.classList.add('input');
                 input.minLength = 1; input.maxLength = 1; input.type = "text"; input.required = true; input.title = "";
                 input.onchange = this.onInput;
+                input.setAttribute('onclick', 'this.select()');
 
                 let icon = document.createElement('div'); icon.id = `cell-${i}-${j}-icon`; icon.classList.add('icon');
+                icon.appendChild(document.createElement('p'));
 
                 parent.appendChild(input);
                 parent.appendChild(icon);
@@ -47,7 +53,34 @@ class Game {
         this.content.style.marginLeft = "10px";
         this.content.style.gridTemplateAreas = gridArea;
 
+        document.getElementById('sol-sol')!.onclick = this.showSolution;
+
         this.createSolution();
+
+        this.timeElement = document.getElementById('time')!;
+
+        // start main loop
+        setInterval(this.loop, 33); // 30 fps
+    }
+
+    private showSolution() {
+        game._showSolution();
+    }
+
+    public _showSolution() {
+        for (let i = 1; i < this.proposedSolution.length - 1; i++) this.highlight(this.proposedSolution[i]);
+    }
+
+    private loop() {
+        let t = window.performance.now();
+        let mil = ("" + (t % 1000)).padStart(3, '0');
+        let sec = ("" + (Math.floor(t / 1000) % 60)).padStart(2, '0');
+        let min = ("" + (Math.floor(t / 60000))).padStart(2, '0');
+
+        let timeString = min + ":" + sec + "." + mil;
+
+        if (this.timeElement == null) this.timeElement = document.getElementById('time')!;
+        else this.timeElement.innerText = timeString;
     }
 
     private onInput(event: Event) {
@@ -64,7 +97,6 @@ class Game {
         let c = {...p, w: target.value.toLowerCase()};
 
         if (target.value == "") { // removing a value
-            console.log(this.cells);
             for (let i = 0; i < this.cells.length; i++) {
                 let _c = this.cells[i];
 
@@ -73,15 +105,36 @@ class Game {
                     break;
                 }
             }
+
             this.markCell(c, "empty");
-        } else { // adding a value
-            this.cells.push(c);
+            this.undoCount++;
+            this.lettersCount--;
+        } else { // adding/replacing a value
+            let exists = false; // replace
+            for (let i = 0; i < this.cells.length; i++) {
+                let _c = this.cells[i];
+                if (_c.x == p.x && _c.y == p.y) {
+                    this.cells[i].w = target.value.toLowerCase();
+                    exists = true;
+                    this.undoCount++;
+                    break;
+                }
+            }
+
+            if (!exists) { // add new
+                this.cells.push(c);
+                this.lettersCount++;
+            }
+
             this.markCellValidity(c);
         }
 
         // check neighbors (not self)
         this.checkWordDir(p, {x: -1, y: 0}); this.checkWordDir(p, {x: 1, y: 0});
         this.checkWordDir(p, {x: 0, y: -1}); this.checkWordDir(p, {x: 0, y: 1});
+
+        document.getElementById('letters')!.innerText = "Letters: " + this.lettersCount;
+        document.getElementById('undo')!.innerText = "Deletes: " + this.undoCount;
     }
 
     private markCellValidity(c: Cell) {
@@ -258,15 +311,16 @@ class Game {
                 for (let i = 0; i < starCount; i++) {
                     let p = {x: -1, y: -1};
                     while (true) {
-                        p = {x: this.rand(0, this.size), y: this.rand(0, this.size)};
-                        let inBounds = this.inBounds(p) && !this.contains(p, this.walls);
-                        let nonTrivial = !this.hasNeighbor(p, this.cells);
+                        p = blacklist[this.rand(0, blacklist.length)]
 
-                        if (inBounds && nonTrivial) break;
+                        if (!this.contains(p, this.goals)) break;
                     } 
 
                     this.markAsStar(p);
                 }
+
+                // update UI
+                document.getElementById('sol-letters')!.innerText = 'Letters: ' + (blacklist.length - wStart.word.length - wEnd.word.length);
 
                 break;
             }
@@ -343,6 +397,14 @@ class Game {
         let p = {x: w.start.x, y: w.start.y};
         for (let i = 0; i < w.word.length; i++) {
             (this.getCellInput(p) as HTMLInputElement).value = w.word.charAt(i);
+            p = this.add(p, w.dir);
+        }
+    }
+
+    private highlight(w: Word) {
+        let p = {x: w.start.x, y: w.start.y};
+        for (let i = 0; i < w.word.length; i++) {
+            if (!this.contains(p, this.goals)) this.getCellIcon(p).getElementsByTagName('p')[0].innerText = w.word.charAt(i);
             p = this.add(p, w.dir);
         }
     }

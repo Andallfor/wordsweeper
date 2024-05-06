@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
 	<head>
-		<title>Word Sweeper</title>
+		<title>Word-Sweeper</title>
 		<link rel="stylesheet" href="./build/style.css">
 	</head>
 	<body>
@@ -9,9 +9,30 @@
 		<script src="./build/words.js"></script>
 		<script src="./build/index.js"></script>
 
-		<div id="content">
-			<div id="crossword-grid">
+		<div id="header">
+			<p class="title">Word-Sweeper</p>
+			<p class="instructions">Connect the two starting words with other valid words (akin to a crossword) to win. Optimize for fewest words/letters used or try to get the stars.</p>
+		</div>
 
+		<div id="interface">
+			<div id="content"><div id="crossword-grid"></div></div>
+			<div id="statistics">
+				<p class="title">Statistics</p>
+				<div class="underline"></div>
+				<div id="time">01:34:1234</div>
+				<div id="letters" class="stat">Letters: 0</div>
+				<div id="undo" class="stat">Deletes: 0</div>
+
+				<div style="margin-top: 32px;"></div>
+
+				<p class="title">Solution</p>
+				<div class="underline"></div>
+				<div id="sol-letters" class="stat">Letters: </div>
+				<div id="sol-seed" class="stat">Seed: Todo</div>
+				
+				<div style="height:8px"></div>
+				<div class="disclaimer">(Solution is not necessarily optimal)</div>
+				<button id="sol-sol" class="button-6" role="button">Show Solution</button>
 			</div>
 		</div>
 	</body>
