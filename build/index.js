@@ -2,14 +2,14 @@
 // hack: since its much easier to just use a static page and bundle the ts inside, i cant really use exports/import (at least idk how)
 // so instead modules are defined inside index.html and we just reference the values stored (i.e. WORDS from words.ts)
 // dont question it
+let game;
 class Game {
     constructor(size) {
-        this.grid = []; // ts doesnt have char, so each string represents a row
         this.proposedSolution = [];
         this.goals = [];
+        this.cells = [];
+        this.walls = [];
         this.size = size;
-        for (let i = 0; i < size; i++)
-            this.grid.push(" ".repeat(size));
         this.content = document.getElementById('crossword-grid');
         let gridArea = '';
         for (let i = 0; i < size; i++) { // yes
@@ -27,9 +27,9 @@ class Game {
                 input.minLength = 1;
                 input.maxLength = 1;
                 input.type = "text";
-                input.pattern = "^[sS]{1}$";
                 input.required = true;
                 input.title = "";
+                input.onchange = this.onInput;
                 let icon = document.createElement('div');
                 icon.id = `cell-${i}-${j}-icon`;
                 icon.classList.add('icon');
@@ -42,6 +42,103 @@ class Game {
         this.content.style.marginLeft = "10px";
         this.content.style.gridTemplateAreas = gridArea;
         this.createSolution();
+    }
+    onInput(event) {
+        game._onInput(event); // let _onInput have proper context
+    }
+    _onInput(event) {
+        event = event;
+        let target = event.currentTarget;
+        let cell = target.parentElement;
+        if (target.value == "") {
+        }
+        else {
+            let _p = cell.id.split('-');
+            let p = { x: +_p[1], y: +_p[2] };
+            let c = Object.assign(Object.assign({}, p), { w: target.value.toLowerCase() });
+            this.cells.push(c);
+            this.checkWordDir(p, { x: -1, y: 0 });
+            this.checkWordDir(p, { x: 1, y: 0 });
+            this.checkWordDir(p, { x: 0, y: -1 });
+            this.checkWordDir(p, { x: 0, y: 1 });
+            this.markCellValidity(c);
+        }
+    }
+    markCellValidity(c) {
+        let vert = this.getConnectingLetters(c, { x: -1, y: 0 }).split("").reverse().join("") + c.w + this.getConnectingLetters(c, { x: 1, y: 0 });
+        let horz = this.getConnectingLetters(c, { x: 0, y: -1 }).split("").reverse().join("") + c.w + this.getConnectingLetters(c, { x: 0, y: 1 });
+        if (vert.length == 1 && horz.length == 1)
+            this.markCell(c, 'invalid');
+        else {
+            let isVertValid = this.isValidWord(vert);
+            let isHorzValid = this.isValidWord(horz);
+            //console.log(vert, horz, c.w, isVertValid, isHorzValid);
+            let vTag = isVertValid ? 'valid' : 'invalid';
+            let hTag = isHorzValid ? 'valid' : 'invalid';
+            if (vert.length == 1)
+                this.markCell(c, hTag); // only check horz
+            else if (horz.length == 1)
+                this.markCell(c, vTag); // only check vert
+            else { // at an intersection of two words
+                if (isVertValid && isHorzValid)
+                    this.markCell(c, 'valid');
+                else if (isVertValid || isHorzValid)
+                    this.markCell(c, 'mixed');
+                else
+                    this.markCell(c, 'invalid');
+            }
+        }
+    }
+    isValidWord(s) {
+        if (s.length < 3)
+            return false;
+        return WORDS.includes(s.toLowerCase());
+    }
+    checkWordDir(p, dir) {
+        let copy = { x: p.x, y: p.y };
+        while (true) {
+            copy = this.add(copy, dir);
+            if (!this.inBounds(copy))
+                break;
+            let c = this.tryGetCell(copy);
+            if (c == null)
+                break;
+            this.markCellValidity(c);
+        }
+    }
+    markCell(p, tag) {
+        let cell = this.getCell(p);
+        if (cell.classList.contains('wall') || cell.classList.contains('goal'))
+            return;
+        // shush
+        cell.classList.replace('valid', tag);
+        cell.classList.replace('invalid', tag);
+        cell.classList.replace('empty', tag);
+        cell.classList.replace('mixed', tag);
+    }
+    getConnectingLetters(p, dir) {
+        let out = "";
+        let copy = { x: p.x, y: p.y };
+        while (true) {
+            copy = this.add(copy, dir);
+            if (!this.inBounds(copy))
+                break;
+            let c = this.tryGetCell(copy);
+            if (c == null)
+                break;
+            out += c.w;
+        }
+        return out;
+    }
+    tryGetCell(p) {
+        let out = null;
+        this.cells.forEach(c => {
+            if (c.x == p.x && c.y == p.y) {
+                out = c;
+                return;
+            }
+        });
+        return out;
     }
     createSolution() {
         // create solution (just brute force a solution lol)
@@ -104,13 +201,7 @@ class Game {
                     while (true) {
                         p = { x: this.rand(0, this.size), y: this.rand(0, this.size) };
                         let inBounds = this.inBounds(p);
-                        let inWhitelist = true;
-                        blacklist.forEach(b => {
-                            if (b.x == p.x && b.y == p.y) {
-                                inWhitelist = false;
-                                return;
-                            }
-                        });
+                        let inWhitelist = !this.contains(p, blacklist);
                         if (inBounds && inWhitelist)
                             break;
                     }
@@ -119,11 +210,25 @@ class Game {
                 // setup the start and end words
                 let wStart = this.proposedSolution[0];
                 let wEnd = this.proposedSolution[this.proposedSolution.length - 1];
-                this.proposedSolution.forEach(w => this.write(w));
-                //this.write(wStart);
-                //this.write(wEnd);
+                this.cells = this.cells.concat(this.getCellSpan(wStart)).concat(this.getCellSpan(wEnd));
+                //this.proposedSolution.forEach(w => this.write(w));
+                this.write(wStart);
+                this.write(wEnd);
                 this.goals = this.goals.concat(this.getWordSpan(wStart)).concat(this.getWordSpan(wEnd));
                 this.goals.forEach(p => this.markAsGoal(p));
+                // generate stars
+                let starCount = this.rand(3, 6);
+                for (let i = 0; i < starCount; i++) {
+                    let p = { x: -1, y: -1 };
+                    while (true) {
+                        p = { x: this.rand(0, this.size), y: this.rand(0, this.size) };
+                        let inBounds = this.inBounds(p) && !this.contains(p, this.walls);
+                        let nonTrivial = !this.hasNeighbor(p, this.cells);
+                        if (inBounds && nonTrivial)
+                            break;
+                    }
+                    this.markAsStar(p);
+                }
                 break;
             }
         }
@@ -208,15 +313,28 @@ class Game {
         }
         return out;
     }
-    getCell(p) {
-        return document.getElementById('cell-' + p.x + '-' + p.y);
+    getCellSpan(w) {
+        let out = [];
+        let copy = { x: w.start.x, y: w.start.y };
+        for (let i = 0; i < w.word.length; i++) {
+            out.push({ x: copy.x, y: copy.y, w: w.word.charAt(i) });
+            copy = this.add(copy, w.dir);
+        }
+        return out;
     }
-    getCellInput(p) {
-        return document.getElementById('cell-' + p.x + '-' + p.y + '-input');
+    contains(p, list) {
+        let out = false;
+        list.forEach(x => {
+            if (x.x == p.x && x.y == p.y) {
+                out = true;
+                return;
+            }
+        });
+        return out;
     }
-    getCellIcon(p) {
-        return document.getElementById('cell-' + p.x + '-' + p.y + '-icon');
-    }
+    getCell(p) { return document.getElementById('cell-' + p.x + '-' + p.y); }
+    getCellInput(p) { return document.getElementById('cell-' + p.x + '-' + p.y + '-input'); }
+    getCellIcon(p) { return document.getElementById('cell-' + p.x + '-' + p.y + '-icon'); }
     markAsGoal(p) {
         let h = this.getCell(p);
         h.classList.add('goal');
@@ -224,29 +342,24 @@ class Game {
         this.getCellIcon(p).innerHTML += `
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="rgba(65,176,110,1)">
                 <path d="M2 3H21.1384C21.4146 3 21.6385 3.22386 21.6385 3.5C21.6385 3.58701 21.6157 3.67252 21.5725 3.74807L18 10L21.5725 16.2519C21.7095 16.4917 21.6262 16.7971 21.3865 16.9341C21.3109 16.9773 21.2254 17 21.1384 17H4V22H2V3Z"></path>
-            </svg>;`;
+            </svg>`;
     }
     markAsWall(p) {
         this.getCell(p).classList.add('wall');
+        this.walls.push(p);
     }
-    inBounds(p) {
-        return p.x >= 0 && p.y >= 0 && p.x < this.size && p.y < this.size;
+    markAsStar(p) {
+        this.getCellIcon(p).innerHTML += `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="rgba(255,191,0,1)">
+                <path d="M12.0006 18.26L4.94715 22.2082L6.52248 14.2799L0.587891 8.7918L8.61493 7.84006L12.0006 0.5L15.3862 7.84006L23.4132 8.7918L17.4787 14.2799L19.054 22.2082L12.0006 18.26Z"></path>
+            </svg>`;
     }
-    add(p1, p2) {
-        return { x: p1.x + p2.x, y: p1.y + p2.y };
-    }
-    sub(p1, p2) {
-        return { x: p1.x - p2.x, y: p1.y - p2.y };
-    }
-    mul(p1, p2) {
-        return { x: p1.x * p2.x, y: p1.y * p2.y };
-    }
-    mag(p1) {
-        return Math.sqrt(p1.x * p1.x + p1.y * p1.y);
-    }
-    rand(min, max) {
-        return Math.floor(Math.random() * (max - min) + min);
-    }
+    inBounds(p) { return p.x >= 0 && p.y >= 0 && p.x < this.size && p.y < this.size; }
+    add(p1, p2) { return { x: p1.x + p2.x, y: p1.y + p2.y }; }
+    sub(p1, p2) { return { x: p1.x - p2.x, y: p1.y - p2.y }; }
+    mul(p1, p2) { return { x: p1.x * p2.x, y: p1.y * p2.y }; }
+    mag(p1) { return Math.sqrt(p1.x * p1.x + p1.y * p1.y); }
+    rand(min, max) { return Math.floor(Math.random() * (max - min) + min); }
     getRandWord(maxLength, buffer = { x: 100, y: 100 }, char = "", iter = 10) {
         let c = 0;
         while (true) {
@@ -272,5 +385,5 @@ class Game {
     }
 }
 window.addEventListener('load', function () {
-    const game = new Game(12);
+    game = new Game(12);
 });
