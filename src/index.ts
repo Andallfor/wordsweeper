@@ -320,7 +320,10 @@ class Game {
                 }
 
                 // update UI
-                document.getElementById('sol-letters')!.innerText = 'Letters: ' + (blacklist.length - wStart.word.length - wEnd.word.length);
+                let length = 0;
+                this.proposedSolution.forEach(x => length += x.word.length);
+                length += -wStart.word.length - wEnd.word.length - this.proposedSolution.length + 1; // remove intersections and start/end
+                document.getElementById('sol-letters')!.innerText = 'Letters: ' + length;
 
                 break;
             }
