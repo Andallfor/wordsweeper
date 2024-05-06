@@ -1,2 +1,2 @@
 # Word-Sweeper
-See [here]() to play. Instructions are on the website.
+See [here](https://andallfor.github.io/wordsweeper/) to play. Instructions are on the website.
