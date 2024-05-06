@@ -50,19 +50,29 @@ class Game {
         event = event;
         let target = event.currentTarget;
         let cell = target.parentElement;
-        if (target.value == "") {
+        let _p = cell.id.split('-');
+        let p = { x: +_p[1], y: +_p[2] };
+        let c = Object.assign(Object.assign({}, p), { w: target.value.toLowerCase() });
+        if (target.value == "") { // removing a value
+            console.log(this.cells);
+            for (let i = 0; i < this.cells.length; i++) {
+                let _c = this.cells[i];
+                if (_c.x == p.x && _c.y == p.y) {
+                    this.cells.splice(i, 1);
+                    break;
+                }
+            }
+            this.markCell(c, "empty");
         }
-        else {
-            let _p = cell.id.split('-');
-            let p = { x: +_p[1], y: +_p[2] };
-            let c = Object.assign(Object.assign({}, p), { w: target.value.toLowerCase() });
+        else { // adding a value
             this.cells.push(c);
-            this.checkWordDir(p, { x: -1, y: 0 });
-            this.checkWordDir(p, { x: 1, y: 0 });
-            this.checkWordDir(p, { x: 0, y: -1 });
-            this.checkWordDir(p, { x: 0, y: 1 });
             this.markCellValidity(c);
         }
+        // check neighbors (not self)
+        this.checkWordDir(p, { x: -1, y: 0 });
+        this.checkWordDir(p, { x: 1, y: 0 });
+        this.checkWordDir(p, { x: 0, y: -1 });
+        this.checkWordDir(p, { x: 0, y: 1 });
     }
     markCellValidity(c) {
         let vert = this.getConnectingLetters(c, { x: -1, y: 0 }).split("").reverse().join("") + c.w + this.getConnectingLetters(c, { x: 1, y: 0 });
@@ -72,7 +82,6 @@ class Game {
         else {
             let isVertValid = this.isValidWord(vert);
             let isHorzValid = this.isValidWord(horz);
-            //console.log(vert, horz, c.w, isVertValid, isHorzValid);
             let vTag = isVertValid ? 'valid' : 'invalid';
             let hTag = isHorzValid ? 'valid' : 'invalid';
             if (vert.length == 1)
